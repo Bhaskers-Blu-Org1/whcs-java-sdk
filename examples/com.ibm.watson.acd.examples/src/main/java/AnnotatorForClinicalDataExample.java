@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.io.InputStream;
+
 
 
 
@@ -25,11 +27,18 @@ import com.ibm.cloud.sdk.core.security.BasicAuthenticator;
 import com.ibm.watson.health.acd.v1.AnnotatorForClinicalData;
 import com.ibm.watson.health.acd.v1.model.AcdFlow;
 import com.ibm.watson.health.acd.v1.model.AcdProfile;
+import com.ibm.watson.health.acd.v1.model.AcdCartridges;
 import com.ibm.watson.health.acd.v1.model.AnalyzeWithFlowOptions;
 import com.ibm.watson.health.acd.v1.model.Annotator;
 import com.ibm.watson.health.acd.v1.model.AnnotatorFlow;
 import com.ibm.watson.health.acd.v1.model.ConfigurationEntity;
 import com.ibm.watson.health.acd.v1.model.Annotator.Name;
+import com.ibm.watson.health.acd.v1.model.CartridgesGetOptions;
+import com.ibm.watson.health.acd.v1.model.CartridgesGetIdOptions;
+import com.ibm.watson.health.acd.v1.model.CartridgesPostMultipartOptions;
+import com.ibm.watson.health.acd.v1.model.CartridgesPutMultipartOptions;
+import com.ibm.watson.health.acd.v1.model.DeployCartridgeResponse;
+import com.ibm.watson.health.acd.v1.model.DeployCartridgeOptions;
 import com.ibm.watson.health.acd.v1.model.ContainerGroup;
 import com.ibm.watson.health.acd.v1.model.CreateFlowsOptions;
 import com.ibm.watson.health.acd.v1.model.CreateProfileOptions;
@@ -52,15 +61,13 @@ import com.ibm.watson.health.acd.v1.util.FlowUtil;
 public class AnnotatorForClinicalDataExample {
 	
 
-	public static String ACD_APIKEY="NCDY7S79ivbkZkQ94-D-jHiimkeo_QW_0103yhw3m5oV";
+	public static String ACD_APIKEY="xxx";
 	public static String ACD_URL="https://us-south.wh-acd.cloud.ibm.com/wh-acd/api";
 	public static String version = "2020-05-18";
 	public static String name="AnnotatorForClinicalData";
 	
 	public static String Constants_PROFILE_ID  = "p51c";
 	public static String Constants_FLOW_ID  = "flow51asdf";
-	
-
 
 	public static String FLOW_ID_DEFAULT  = "wh_acd.ibm_clinical_insights_v1.0_standard_flow";
 	public static String FLOW_ID_COVID  = "wh_acd.ibm_covid-19_research_v1.0_covid-19_flow_flow";
@@ -69,12 +76,6 @@ public class AnnotatorForClinicalDataExample {
 	public static AnnotatorForClinicalData acd = null;
 	public static Annotator annotatorSC = null;
 	public static Annotator annotatorCD = null;
-	
-	public enum Action {	    	    
-		PROFILE_ALL, PROFILE_CREATE, PROFILE_READ, PROFILE_UPDATE, PROFILE_DELETE,
-		FLOW_ALL, FLOW_CREATE, FLOW_READ, FLOW_UPDATE, FLOW_DELETE,	    
-		CARTRIDGES_ALL, CARTRIDGES_CREATE, CARTRIDGES_READ, CARTRIDGES_UPDATE, CARTRIDGES_DELETE
-	}	
 	
 	static {
 
@@ -100,44 +101,53 @@ public class AnnotatorForClinicalDataExample {
 
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws Exception {
 
 		/**
 		 * analyze
 		 */
-		analyze();		
-		analyzeWithFlowId(FLOW_ID_DEFAULT);
+		//analyze();		
+		//analyzeWithFlowId(FLOW_ID_DEFAULT);
 		
 		/**
 		 * profiles
-		 *
+		 */
 		getProfiles(); // read all profiles
-		String sProfileId ="p61a";
-		deleteProfile(sProfileId);
+		String sProfileId ="p61a"+System.currentTimeMillis();		
 		createProfile(sProfileId);
 		getProfile(sProfileId);
-		String sProfileName=sProfileId+"-name";
-		String sProfileDescription=sProfileId+"-description";
+		deleteProfile(sProfileId);
+		//String sProfileName=sProfileId+"-name";
+		//String sProfileDescription=sProfileId+"-description";
 		//updateProfile( sProfileId, sProfileName, sProfileDescription );
 		//getProfile(sProfileId);
 		//deleteProfile(sProfileId);
-		 * 
-		 */
+
 
 		
 		/**
 		 * FLOWS
-		 *
+		 */
 		getFlows();
-		getFlow(FLOW_ID_DEFAULT);
-		*/
+		String sFlowId ="f61a"+System.currentTimeMillis();		
+		createFlow(sFlowId);
+		getFlow(sFlowId);
+		deleteFlow(sFlowId);
+		
 		 
 		/**
 		 * CARTRIDGES
 		 */
 		// cartridges
 		// getCartridges() -> not implemented yet
-		// getCartridge
+		// 
+		//String sZipFile="testacd_deploycart_dict_v1.0.zip";
+		String sZipFile="testacd_deploycart_attr_v1.0.zip";		
+		//deployCartridge(sZipFile);
+		redeployCartridge(sZipFile);
+		legacyDeploy(sZipFile);
+		getCartridge(sZipFile.replace(".zip", ""));
+
 
 	}
 
@@ -170,7 +180,9 @@ public class AnnotatorForClinicalDataExample {
 				
 		// [] checking flowId
 		sFlowId = (sFlowId == null) ? FLOW_ID_DEFAULT : sFlowId;
-		sFlowId = (sFlowId.length() == 0) ? FLOW_ID_DEFAULT : sFlowId;		
+		sFlowId = (sFlowId.length() == 0) ? FLOW_ID_DEFAULT : sFlowId;
+		
+		//acd.analyzeWithFlow(flowId, text)
 
 		//.contentType(Constants.CONTENT_TYPE)		
 		AnalyzeWithFlowOptions options = new AnalyzeWithFlowOptions.Builder(sFlowId)
@@ -205,10 +217,9 @@ public class AnnotatorForClinicalDataExample {
 	
 	
 	// GET /profiles/{id}
-	public static void getProfile() {
-		
-		
-		GetProfileOptions options = new GetProfileOptions.Builder().id(Constants_PROFILE_ID).build();
+	public static void getProfile(String sId) {
+				
+		GetProfileOptions options = new GetProfileOptions.Builder().id(sId).build();
 		ServiceCall<AcdProfile> sc = acd.getProfile(options);
 		Response<AcdProfile> response = sc.execute();
 		AcdProfile profile = response.getResult();
@@ -247,20 +258,8 @@ public class AnnotatorForClinicalDataExample {
 		AcdProfile profile = response.getResult();
 		if( profile == null )
 			return;
-
-		/**
-		System.out.println(profile);
 		System.out.println(profile.id() );
-		if (profile.description() != null) {
-			System.out.println( profile.description().length() > 0); 
-		}
 
-		List<Annotator> annotators = profile.annotators();
-		for (Annotator annotator : annotators) {
-			System.out.println(annotator.name());
-			System.out.println(annotator.description());
-		}	
-		**/	
 
 	}
 
@@ -329,10 +328,10 @@ public class AnnotatorForClinicalDataExample {
 	}
 
 	// GET /flows/{id}
-	public static void getFlow() {
+	public static void getFlow(String sId) {
 		
 		GetFlowsByIdOptions options = new GetFlowsByIdOptions.Builder()
-				.id(FLOW_ID_DEFAULT)
+				.id(sId)
 				.build();
 		ServiceCall<AcdFlow> sc = acd.getFlowsById(options);
 		Response<AcdFlow> response = sc.execute();
@@ -340,6 +339,7 @@ public class AnnotatorForClinicalDataExample {
 		if( flow == null )
 			return;
 
+		/*
 		System.out.println(flow);
 		System.out.println(flow.id() + " " +  FLOW_ID_DEFAULT);
 		System.out.println(flow.name());
@@ -358,20 +358,18 @@ public class AnnotatorForClinicalDataExample {
 				System.out.println( " annotator Name : " + annotator.name() );
 			}
 		}
-		
+		*/
 
 	}
 
 	// POST /flows
-	public static void createFlow() {
+	public static void createFlow(String sId) {
 		
 		//.addAnnotators(
 		//.annotators(new ArrayList<Annotator>(Arrays.asList(annotatorSC)))	    
 		CreateFlowsOptions options = new CreateFlowsOptions
 				.Builder()
-				.id(Constants_FLOW_ID)
-				.name(Constants_FLOW_ID)
-				.acdFlow( createFlowSample() )
+				.acdFlow( createFlowSample(sId) )
 				.build();
 
 		ServiceCall sc = acd.createFlows(options);
@@ -386,18 +384,16 @@ public class AnnotatorForClinicalDataExample {
 	/**
 	 * ACD Service Flow
 	 */	
-	private static AcdFlow createFlowSample() {
+	private static AcdFlow createFlowSample(String sId) {
 
-		ConfigurationEntity configurationEntityModel = new ConfigurationEntity.Builder()
+		
+		/**ConfigurationEntity configurationEntityModel = new ConfigurationEntity.Builder()
 				.id("testString")
 				.type("testString")
 				.uid(Long.valueOf("26"))
 				.mergeid(Long.valueOf("26"))
 				.build();
-		//assertEquals(configurationEntityModel.id(), "testString");
-		//assertEquals(configurationEntityModel.type(), "testString");
-		//assertEquals(configurationEntityModel.uid(), Long.valueOf("26"));
-		//assertEquals(configurationEntityModel.mergeid(), Long.valueOf("26"));
+				**/
 
 		FlowEntry flowEntryModel = new FlowEntry.Builder().annotator(annotatorSC).build();	    
 
@@ -405,31 +401,15 @@ public class AnnotatorForClinicalDataExample {
 				.elements(new ArrayList<FlowEntry>(Arrays.asList(flowEntryModel)))
 				.async(true)
 				.build();
-		//assertEquals(flowModel.elements(), new ArrayList<FlowEntry>(Arrays.asList(flowEntryModel)));
-		//assertEquals(flowModel.async(), Boolean.valueOf(true));
+
 
 		AnnotatorFlow annotatorFlowModel = new AnnotatorFlow.Builder()
 				.profile("testString")
 				.flow(flowModel)
-				//	    	      .id("testString")
-				//	    	      .type("testString")
-				//	    	      .data(new java.util.HashMap<String,List<Entity>>(){{put("foo", new ArrayList<Entity>(Arrays.asList(entityModel))); }})
-				//	    	      .metadata(new java.util.HashMap<String,Object>(){{put("foo", "testString"); }})
-				//     .globalConfigurations(new ArrayList<ConfigurationEntity>(Arrays.asList(configurationEntityModel)))
-				//     .uid(Long.valueOf("26"))
 				.build();
-		//assertEquals(annotatorFlowModel.profile(), "testString");
-		//assertEquals(annotatorFlowModel.flow(), flowModel);
-		//	    	    assertEquals(annotatorFlowModel.id(), "testString");
-		//	    	    assertEquals(annotatorFlowModel.type(), "testString");
-		//	    	    assertEquals(annotatorFlowModel.data(), new java.util.HashMap<String,List<Entity>>(){{put("foo", new ArrayList<Entity>(Arrays.asList(entityModel))); }});
-		//	    	    assertEquals(annotatorFlowModel.metadata(), new java.util.HashMap<String,Object>(){{put("foo", "testString"); }});
-		//	    	    assertEquals(annotatorFlowModel.globalConfigurations(), new ArrayList<ConfigurationEntity>(Arrays.asList(configurationEntityModel)));
-		//	    	    assertEquals(annotatorFlowModel.uid(), Long.valueOf("26"));
 
 		AcdFlow acdFlowModel = new AcdFlow.Builder()
-				.id(Constants_FLOW_ID)
-				.name(Constants_FLOW_ID)
+				.id(sId)
 				//.description("testString")
 				//.publishedDate("testString")
 				//.publish(true)
@@ -448,11 +428,11 @@ public class AnnotatorForClinicalDataExample {
 	}
 
 	// DELETE /flows/{id}
-	public static void deleteFlow() {
+	public static void deleteFlow(String sId) {
 		
 		DeleteFlowsOptions options = new DeleteFlowsOptions
 				.Builder()
-				.id(Constants_FLOW_ID)
+				.id(sId)
 				.build();
 
 		ServiceCall sc = acd.deleteFlows(options);
@@ -484,35 +464,77 @@ public class AnnotatorForClinicalDataExample {
 		//CartridgesGetOptions options = new CartridgesGetOptions.Builder().build();
 		// https://github.com/IBM/whcs-java-sdk/blob/master/modules/annotator-for-clinical-data/src/main/java/com/ibm/watson/health/acd/v1/model/CartridgesGetOptions.java
 		
-		/*
-		GetFlowsOptions options = new GetFlowsOptions.Builder().build();
-		ServiceCall<Map<String, AcdFlow>> serviceCall = acd.getFlows(options);
-		Response<Map<String, AcdFlow>> response = serviceCall.execute();
-		Map<String, AcdFlow> mapStrAcdFlow = response.getResult(); 
-		for( String strKey :  mapStrAcdFlow.keySet() ) {
-			System.out.println(  strKey + " : " + mapStrAcdFlow.get(strKey) );	
-		}
-		*/
 	}
 
 	// GET /cartridges/{id}
-	public static void getCartridge() {
+	public static void getCartridge(String sId) {
+		
+		CartridgesGetIdOptions options = new CartridgesGetIdOptions.Builder()
+				.id(sId)
+				.build();
+		ServiceCall<AcdCartridges> sc = acd.cartridgesGetId(options);
+		Response<AcdCartridges> response = sc.execute();
+		AcdCartridges cartridges = response.getResult();		
+		if( cartridges == null )
+			return;
+		
+		System.out.println ( " id  : " + cartridges.getId() );
+		System.out.println ( " correlationId: " +  cartridges.getCorrelationId() ); 
 
 	}
+	
+	
 
 	// POST /cartridges
-	public static void deployCartridge() {
+	public static void deployCartridge(String sZipFile) throws Exception {
+				
+		InputStream archiveFile = ClassLoader.getSystemResourceAsStream(sZipFile);		
+		CartridgesPostMultipartOptions options = new CartridgesPostMultipartOptions
+				.Builder()
+				.archiveFile(archiveFile)
+				.build();
+		
+		ServiceCall<DeployCartridgeResponse> sc = acd.cartridgesPostMultipart(options);
+		Response<DeployCartridgeResponse> response = sc.execute();
+		DeployCartridgeResponse cartridges = response.getResult();		
+		if( cartridges == null )
+			return;
 
 	}
 
 	// PUT /cartridges
-	public static void redeployCartridge() {
+	public static void redeployCartridge(String sZipFile) throws Exception {
+		
+		InputStream archiveFile = ClassLoader.getSystemResourceAsStream(sZipFile);
+		CartridgesPutMultipartOptions options = new CartridgesPutMultipartOptions
+				.Builder()
+				.archiveFile(archiveFile)
+				.build();
+		
+		ServiceCall<DeployCartridgeResponse> sc = acd.cartridgesPutMultipart(options);
+		Response<DeployCartridgeResponse> response = sc.execute();
+		DeployCartridgeResponse cartridges = response.getResult();		
+		if( cartridges == null )
+			return;
 
 	}
 
 	// POST /deploy
-	public static void legacyDeploy() {
-
+	public static void legacyDeploy(String sZipFile) throws Exception {
+		
+		InputStream archiveFile = ClassLoader.getSystemResourceAsStream(sZipFile);
+		DeployCartridgeOptions options = new DeployCartridgeOptions
+					.Builder()
+					.archiveFile(archiveFile)
+					.update(true)
+					.build();
+		
+		ServiceCall<DeployCartridgeResponse> sc = acd.deployCartridge(options);
+		Response<DeployCartridgeResponse> response = sc.execute();
+		DeployCartridgeResponse cartridges = response.getResult();		
+		if( cartridges == null )
+			return;
+			
 	}
 	
 
